@@ -3,6 +3,7 @@ package gee
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 // HandlerFunc defines the request handler used by gee
@@ -25,8 +26,16 @@ type RouterGroup struct {
 
 // ServeHTTP implement the interface of Handle
 func (e *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// register middlewares
+	var middlewares []HandlerFunc
+	for _, group := range e.groups {
+		if strings.HasPrefix(req.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
 	// newContext create request context
 	c := newContext(w, req)
+	c.Handlers = middlewares
 	e.router.handle(c)
 }
 
@@ -49,6 +58,10 @@ func (g *RouterGroup) Group(prefix string) *RouterGroup {
 	}
 	engine.groups = append(engine.groups, newGroup)
 	return newGroup
+}
+
+func (g *RouterGroup) Use(middlewares ...HandlerFunc) {
+	g.middlewares = append(g.middlewares, middlewares...)
 }
 
 func (g *RouterGroup) addRoute(method string, comp string, handler HandlerFunc) {
